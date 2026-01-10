@@ -6,11 +6,8 @@ import time
 from kafka import KafkaProducer
 from datetime import datetime
 
-# Finland Traffic Measurements API
 API_URL = "https://tie.digitraffic.fi/api/tms/v1/stations/data"
 
-
-# Kafka configuration
 KAFKA_TOPIC = "traffic-finland"
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 
@@ -48,8 +45,6 @@ def produce_events(data):
                     key=str(station_id).encode("utf-8"),
                     value=event
                 )
-
-                print(event)
 
             except Exception as e:
                 print(f"Skipping sensor at station {station_id}: {e}")
