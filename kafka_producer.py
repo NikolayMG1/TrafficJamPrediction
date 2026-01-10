@@ -23,27 +23,48 @@ def fetch_traffic_data():
     return response.json()
 
 def produce_events(data):
-    for station in data.get("results", []):
+    result = {}
+
+    for station in data.get("stations", []):
         try:
+            date = station.get("dataUpdatedTime")
+            tmsNumber = station.get("tmsNumber")
+            sensorValues = station.get("sensorValues", [])
+
+            # result must be a dict, not a list
+            result[tmsNumber] = []
+
+            for sensor in sensorValues:
+                if sensor.get("unit") == "km/h":
+                    start_str = sensor.get("timeWindowStart")
+                    end_str = sensor.get("timeWindowEnd")
+  
+                    start_time = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                    end_time = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+                    elapsed_time = (end_time - start_time).total_seconds()
+                    print(f"start_time: {start_time}, end_time: {end_time} and elapsed_time: {elapsed_time}")
+                    speed = sensor.get("value")
+                    print(f"Station {tmsNumber} - Elapsed Time: {elapsed_time}, Speed: {speed}")
+                    
+                    result[tmsNumber].append({
+                        "elapsed_time": str(elapsed_time),
+                        "speed": speed
+                    })
+
             event = {
-                "event_time": station.get("measurementTime")
-                              or datetime.utcnow().isoformat(),
-                "station_id": station.get("id"),
-                "road_name": station.get("name"),
-                "vehicle_count": station.get("vehicleCount"),
-                "avg_speed": station.get("averageSpeed"),
-                "latitude": station.get("location", {}).get("coordinates", [None, None])[1],
-                "longitude": station.get("location", {}).get("coordinates", [None, None])[0],
-                "source": "Helsinki Traffic API"
+                "event_time": date,
+                "station_id": tmsNumber,
+                "measurements": result[tmsNumber]
             }
 
-            producer.send(KAFKA_TOPIC, event)
+            # print(f"Producing event for station event {event}")
+            producer.send(KAFKA_TOPIC, value=event)
 
         except Exception as e:
             print(f"Skipping invalid record: {e}")
 
     producer.flush()
-
+    
 def main():
     while True:
         try:
