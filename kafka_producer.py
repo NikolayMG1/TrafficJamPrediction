@@ -62,20 +62,13 @@ def produce_events(data):
 def produce_station_metadata(data):
     for station in data.get("features", []):
 
-        #pprint.pprint(station)
         try:
-            station_id = station.get("id")
-            geometry  = station.get("geometry")
-            coordinates = geometry.get("coordinates")
-
             event = {
-                "station_id": station.get("id"),  # unique station identifier
+                "station_id": station.get("id"),  
                 "longitude": station.get("geometry", {}).get("coordinates", [None, None, 0.0])[0],
                 "latitude": station.get("geometry", {}).get("coordinates", [None, None, 0.0])[1],
                 "altitude": station.get("geometry", {}).get("coordinates", [None, None, 0.0])[2],
             }
-
-            print(event)
 
             producer.send(
                 KAFKA_TOPIC_STATION,
