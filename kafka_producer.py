@@ -26,7 +26,7 @@ def fetch_traffic_data():
 
 def produce_events(data):
     for station in data.get("stations", []):
-        station_id = station.get("tmsNumber") or station.get("id")
+        station_id = station.get("id")
         sensor_values = station.get("sensorValues", [])
 
         for sensor in sensor_values:
@@ -35,13 +35,12 @@ def produce_events(data):
                     "event_time": sensor.get("measuredTime"),
                     "station_id": station_id,
 
-                    "sensor_id": sensor.get("id"),
+                    "entry_id": sensor.get("id"),
+                    "station_id_sensor_value": sensor.get("stationId"),
                     "sensor_name": sensor.get("name"),
                     "sensor_short_name": sensor.get("shortName"),
                     "unit": sensor.get("unit"),
                     "value": sensor.get("value"),
-
-                    "source": "Digitraffic TMS API"
                 }
 
                 producer.send(
