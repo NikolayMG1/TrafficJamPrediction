@@ -4,7 +4,10 @@ from pyspark.sql.types import StructType, StructField, IntegerType, StringType, 
 
 from kafka_producer import KAFKA_TOPIC
 
-spark = SparkSession.builder.appName("DigitrafficRealTime").getOrCreate()
+spark = SparkSession.builder \
+    .appName("DigitrafficRealTime") \
+    .config("spark.jars.packages",  "org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.0") \
+    .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
 
@@ -34,15 +37,15 @@ df_str = df_raw.selectExpr("CAST(value AS STRING) as json_str")
 df_parsed = df_str.select(from_json(col("json_str"), sensor_event_schema).alias("data")).select("data.*")
 
 # 4. Compute real-time metrics: average speed per station
-df_metrics = df_parsed.groupBy("id", "name") \
-    .agg(
-        avg("avgSpeed").alias("avg_speed"),
-        avg("vehicleCount").alias("avg_vehicle_count")
-    )
+# df_metrics = df_parsed.groupBy("id", "name") \
+#     .agg(
+#         avg("avgSpeed").alias("avg_speed"),
+#         avg("vehicleCount").alias("avg_vehicle_count")
+#     )
 
 # 5. Output to console for testing
-query = df_metrics.writeStream \
-    .outputMode("complete") \
+query = df_parsed.writeStream \
+    .outputMode("append") \
     .format("console") \
     .option("truncate", False) \
     .start()
