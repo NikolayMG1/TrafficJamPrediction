@@ -1,3 +1,5 @@
+import pprint
+
 import requests
 import json
 import time
@@ -23,52 +25,42 @@ def fetch_traffic_data():
     return response.json()
 
 def produce_events(data):
-    result = {}
-
     for station in data.get("stations", []):
-        try:
-            date = station.get("dataUpdatedTime")
-            tmsNumber = station.get("tmsNumber")
-            sensorValues = station.get("sensorValues", [])
+        station_id = station.get("tmsNumber") or station.get("id")
+        sensor_values = station.get("sensorValues", [])
 
-            # result must be a dict, not a list
-            result[tmsNumber] = []
+        for sensor in sensor_values:
+            try:
+                event = {
+                    "event_time": sensor.get("measuredTime"),
+                    "station_id": station_id,
 
-            for sensor in sensorValues:
-                if sensor.get("unit") == "km/h":
-                    start_str = sensor.get("timeWindowStart")
-                    end_str = sensor.get("timeWindowEnd")
-  
-                    start_time = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                    end_time = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
-                    elapsed_time = (end_time - start_time).total_seconds()
-                    print(f"start_time: {start_time}, end_time: {end_time} and elapsed_time: {elapsed_time}")
-                    speed = sensor.get("value")
-                    print(f"Station {tmsNumber} - Elapsed Time: {elapsed_time}, Speed: {speed}")
-                    
-                    result[tmsNumber].append({
-                        "elapsed_time": str(elapsed_time),
-                        "speed": speed
-                    })
+                    "sensor_id": sensor.get("id"),
+                    "sensor_name": sensor.get("name"),
+                    "sensor_short_name": sensor.get("shortName"),
+                    "unit": sensor.get("unit"),
+                    "value": sensor.get("value"),
 
-            event = {
-                "event_time": date,
-                "station_id": tmsNumber,
-                "measurements": result[tmsNumber]
-            }
+                    "source": "Digitraffic TMS API"
+                }
 
-            # print(f"Producing event for station event {event}")
-            producer.send(KAFKA_TOPIC, value=event)
+                producer.send(
+                    KAFKA_TOPIC,
+                    key=str(station_id).encode("utf-8"),
+                    value=event
+                )
 
-        except Exception as e:
-            print(f"Skipping invalid record: {e}")
+                print(event)
+
+            except Exception as e:
+                print(f"Skipping sensor at station {station_id}: {e}")
 
     producer.flush()
-    
+
 def main():
     while True:
         try:
-            data = fetch_traffic_data() 
+            data = fetch_traffic_data()
             print("Fetched traffic data from API")
             produce_events(data)
             print("Traffic data sent to Kafka")
@@ -76,7 +68,6 @@ def main():
         except Exception as e:
             print(f"Error fetching or producing data: {e}")
 
-        # Poll API every 60 seconds
         time.sleep(60)
 
 if __name__ == "__main__":
