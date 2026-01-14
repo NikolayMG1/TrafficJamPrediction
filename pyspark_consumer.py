@@ -1,13 +1,23 @@
+import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, avg, count, window, to_timestamp, when
 from pyspark.sql.types import StructType, StructField, IntegerType, StringType, DoubleType
 from kafka_producer import KAFKA_TOPIC
 
+os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
+
+
 spark = SparkSession.builder \
     .appName("DigitrafficRealTime") \
-    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.0") \
+    .master("local[*]") \
+    .config(
+        "spark.jars.packages",
+        "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.4,"
+        "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1"
+    ) \
+    .config("spark.mongodb.connection.uri", "mongodb://localhost:27017/digi-traffic.traffic-data") \
     .getOrCreate()
-
+    
 spark.sparkContext.setLogLevel("WARN")
 
 sensor_event_schema = StructType([
@@ -74,9 +84,8 @@ df_agg = df_agg.withColumn(
 )
 
 query = df_agg.writeStream \
-    .outputMode("complete") \
-    .format("console") \
-    .option("truncate", False) \
+    .format("mongodb") \
+    .option("checkpointLocation", "C:/tmp/checkpoint") \
     .start()
 
 query.awaitTermination()
