@@ -1,24 +1,7 @@
-import os
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, avg, count, window, to_timestamp, when
+from pyspark.sql.functions import  col, avg, count, window, to_timestamp, when
 from pyspark.sql.types import StructType, StructField, IntegerType, StringType, DoubleType
-from kafka_producer import KAFKA_TOPIC
-
-os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
-
-
-spark = SparkSession.builder \
-    .appName("DigitrafficRealTime") \
-    .master("local[*]") \
-    .config(
-        "spark.jars.packages",
-        "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.4,"
-        "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1"
-    ) \
-    .config("spark.mongodb.connection.uri", "mongodb://localhost:27017/digi-traffic.traffic-data") \
-    .getOrCreate()
-    
-spark.sparkContext.setLogLevel("WARN")
+from consumers.utils import read_and_parse_data, start_session, write_to_mongodb
+from producers.kafka_producer import KAFKA_TOPIC
 
 sensor_event_schema = StructType([
     StructField("event_time", StringType(), True),     
@@ -31,24 +14,10 @@ sensor_event_schema = StructType([
     StructField("value", DoubleType(), True)
 ])
 
-# Read from Kafka
-df_raw = spark.readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "127.0.0.1:9092") \
-    .option("subscribe", KAFKA_TOPIC) \
-    .option("startingOffsets", "latest") \
-    .load()
+spark = start_session("mongodb://localhost:27017/digi-traffic.traffic-data")  
+df_parsed = read_and_parse_data(spark, KAFKA_TOPIC, sensor_event_schema)
 
-# Cast value as string
-df_str = df_raw.selectExpr("CAST(value AS STRING) as json_str")
-
-# Parse JSON
-df_parsed = df_str.select(
-    from_json(col("json_str"), sensor_event_schema).alias("data")
-).select("data.*")
-
-######## Data Cleaning #########
-
+################## Data Cleaning ###################
 # 1. Keep only rows where unit is km/h
 df_parsed = df_parsed.filter(col("unit") == "km/h")
 
@@ -61,8 +30,7 @@ df_parsed = df_parsed.filter((col("value").isNotNull()) & (col("value") >= 0) & 
 # 4. Validate station IDs match
 df_parsed = df_parsed.filter(col("station_id") == col("station_id_sensor_value"))
 
-
-########## Data Transformations ##########
+################### Data Aggregation ###################
 df_parsed = df_parsed.withColumn("event_time_ts", to_timestamp("event_time"))
 
 df_agg = df_parsed \
@@ -83,9 +51,4 @@ df_agg = df_agg.withColumn(
     .otherwise("Full stop")
 )
 
-query = df_agg.writeStream \
-    .format("mongodb") \
-    .option("checkpointLocation", "C:/tmp/checkpoint") \
-    .start()
-
-query.awaitTermination()
+write_to_mongodb(df_parsed, "C:/tmp/checkpoint")
