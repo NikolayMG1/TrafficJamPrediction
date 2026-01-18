@@ -1,6 +1,9 @@
+python==3.10.0
+java==11.0.28
 Flask==3.1.2
 folium==0.20.0
 kafka_python==2.3.0
 pandas==2.3.3
-pyspark==4.0.1
 Requests==2.32.5
+pyspark==3.4.4
+pymongo==4.16.0
