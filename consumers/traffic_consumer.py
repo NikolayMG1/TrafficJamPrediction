@@ -51,4 +51,4 @@ df_agg = df_agg.withColumn(
     .otherwise("Full stop")
 )
 
-write_to_mongodb(df_parsed, "C:/tmp/checkpoint")
+write_to_mongodb(df_agg, "C:/tmp/checkpoints/traffic_consumer_v1")
