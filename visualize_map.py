@@ -32,10 +32,9 @@ var markers = L.layerGroup().addTo(map);
 
 // Congestion colors
 var congestion_colors = {
-    "Full stop": "red",
-    "Low congestion": "yellow",
-    "No congestion": "green",
-    "Slightly congested": "orange"
+    "Heavy traffic": "red",
+    "Slightly congested": "yellow",
+    "Not congested": "green"
 };
 
 // Load points from backend
@@ -92,3 +91,4 @@ def data():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
