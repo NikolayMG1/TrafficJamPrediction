@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template_string
 import pandas as pd
 import time
-from format_data import create_df
+from database_get_req import get_from_db_format
 
 app = Flask(__name__)
 
@@ -82,9 +82,10 @@ def index():
 def data():
     global cached_df, last_update
     now = time.time()
-    # Refresh every 60 seconds
-    if cached_df is None or now - last_update > 60:
-        cached_df = create_df()
+
+    if cached_df is None or now - last_update > 5:
+        cached_df = get_from_db_format()
+        print(cached_df)
         time.sleep(5)
         last_update = now
     return jsonify(cached_df.to_dict(orient='records'))
