@@ -45,10 +45,10 @@ df_agg = df_parsed \
 
 df_agg = df_agg.withColumn(
     "congestion_state",
-    when((col("avg_speed") > 60) | (col("vehicle_count") < 50), "Not congested")
-    .when(((col("avg_speed") <= 60) & (col("avg_speed") > 40)) | ((col("vehicle_count") >= 50) & (col("vehicle_count") <= 100)), "Slightly congested")
-    .when(((col("avg_speed") <= 40) & (col("avg_speed") > 20)) | ((col("vehicle_count") > 100) & (col("vehicle_count") <= 200)), "Heavy traffic")
-    .otherwise("Full stop")
+    when((col("avg_speed") <= 5) & (col("vehicle_count") > 100), "Full stop")
+    .when(((col("avg_speed") <= 15) & (col("avg_speed") > 5)) | ((col("vehicle_count") > 50) & (col("vehicle_count") <= 100)), "Heavy traffic")
+    .when(((col("avg_speed") <= 35) & (col("avg_speed") > 15)) | ((col("vehicle_count") > 20) & (col("vehicle_count") <= 50)), "Slightly congested")
+    .otherwise("Not congested")
 )
 
-write_to_mongodb(df_agg, "C:/tmp/checkpoints/traffic_consumer_v1")
+write_to_mongodb(df_agg, "C:/tmp/checkpoints/traffic_consumer_v4")
