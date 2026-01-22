@@ -1,9 +1,11 @@
-from flask import Flask, jsonify, render_template_string
-import pandas as pd
-import time
+from flask import Flask, jsonify, render_template_string, request
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from database_get_req import get_from_db_format
 
 app = Flask(__name__)
+
+FINLAND_TZ = ZoneInfo("Europe/Helsinki")
 
 base_map_html = """
 <!DOCTYPE html>
@@ -13,83 +15,141 @@ base_map_html = """
     <meta charset="utf-8">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
-        html, body, #map { height: 100%; margin: 0; padding: 0; }
+        html, body, #map { height: 100%; margin:0; padding:0; }
+        .control {
+            position:absolute; top:10px; right:10px; z-index:1000;
+            background:white; padding:10px; font-family:Arial; font-size:13px;
+            box-shadow:0 0 6px rgba(0,0,0,0.3);
+        }
+        #calendarBox { margin-top:8px; }
+        button { margin-right:4px; }
+        #status { margin-top:6px; font-size:12px; color:gray; }
     </style>
 </head>
 <body>
+
+<div class="control">
+    <button onclick="toggleCalendar()">Select time</button>
+    <button onclick="backToLive()">Live</button>
+
+    <div id="calendarBox" style="display:none;">
+        <input type="datetime-local" id="historyTime"><br><br>
+        <button onclick="confirmTime()">Confirm</button>
+        <button onclick="toggleCalendar()">Cancel</button>
+    </div>
+
+    <div id="status"></div>
+</div>
+
 <div id="map"></div>
+
 <script>
-var map = L.map('map').setView([64.0, 26.0], 6);
+var map = L.map('map').setView([64.0,26.0],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(map);
 
-// Add OpenStreetMap tiles
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19
-}).addTo(map);
-
-// Keep markers in a layer group
 var markers = L.layerGroup().addTo(map);
-
-// Congestion colors
 var congestion_colors = {
-    "Heavy traffic": "red",
-    "Slightly congested": "yellow",
-    "Not congested": "green"
+    "Heavy traffic":"red",
+    "Slightly congested":"yellow",
+    "Not congested":"green"
 };
 
-// Load points from backend
+var refreshInterval = null;
+var liveMode = true;
+
 function loadPoints() {
-    fetch('/data')
-    .then(response => response.json())
-    .then(data => {
-        markers.clearLayers();  // Remove old markers
-        data.forEach(row => {
-            var color = congestion_colors[row.congestion_state] || "gray";
-            var circle = L.circleMarker([row.latitude, row.longitude], {
-                radius: 5,
-                color: color,
-                fillColor: color,
-                fillOpacity: 0.7
-            }).bindPopup(
-                "Station ID: " + row.station_id + "<br>" +
-                "Vehicle Count: " + row.vehicle_count + "<br>" +
-                "Avg Speed: " + row.avg_speed.toFixed(2) + "<br>" +
-                "Congestion: " + row.congestion_state
-            );
-            markers.addLayer(circle);
+    var selectedTime = document.getElementById("historyTime").value;
+    var url = "/data";
+
+    if (selectedTime) {
+        liveMode = false;
+        url += "?start=" + selectedTime;
+    }
+
+    fetch(url, { cache: "no-store" })
+        .then(response => response.json())
+        .then(data => {
+            markers.clearLayers();
+
+            data.forEach(row => {
+                var color = congestion_colors[row.congestion_state] || "gray";
+                var circle = L.circleMarker(
+                    [row.latitude, row.longitude],
+                    { radius:5, color:color, fillColor:color, fillOpacity:0.7 }
+                ).bindPopup(
+                    "Station ID: " + row.station_id + "<br>" +
+                    "Vehicle Count: " + row.vehicle_count + "<br>" +
+                    "Avg Speed: " + row.avg_speed.toFixed(2) + "<br>" +
+                    "Congestion: " + row.congestion_state
+                );
+                markers.addLayer(circle);
+            });
+
+            document.getElementById("status").innerText =
+                liveMode ? "Live update: " + new Date().toLocaleTimeString()
+                         : "Historical snapshot";
         });
-    });
 }
 
-// Load initially
-loadPoints();
+function toggleCalendar(){
+    var box = document.getElementById("calendarBox");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+}
 
-// Refresh every 60 seconds
-setInterval(loadPoints, 60000);
+function confirmTime(){
+    if (refreshInterval) clearInterval(refreshInterval);
+    toggleCalendar();
+    loadPoints();
+}
+
+function startLiveMode(){
+    liveMode = true;
+    loadPoints();
+    refreshInterval = setInterval(loadPoints, 60000);
+}
+
+function backToLive(){
+    document.getElementById("historyTime").value = "";
+    if (refreshInterval) clearInterval(refreshInterval);
+    startLiveMode();
+}
+
+startLiveMode();
 </script>
+
 </body>
 </html>
 """
 
-cached_df = None
-last_update = 0
-
-@app.route('/')
+@app.route("/")
 def index():
     return render_template_string(base_map_html)
 
-@app.route('/data')
+@app.route("/data")
 def data():
-    global cached_df, last_update
-    now = time.time()
+    start = request.args.get("start")
 
-    if cached_df is None or now - last_update > 5:
-        cached_df = get_from_db_format()
-        print(cached_df)
-        time.sleep(5)
-        last_update = now
-    return jsonify(cached_df.to_dict(orient='records'))
+    if not start:
+        # LIVE MODE → last 5 minutes (UTC)
+        window_end = datetime.now(timezone.utc)
+        window_start = window_end - timedelta(minutes=5)
+    else:
+        # HISTORICAL MODE → convert local time to UTC
+        local_dt = datetime.fromisoformat(start)
+        local_dt = local_dt.replace(tzinfo=FINLAND_TZ)
+        window_end = local_dt.astimezone(timezone.utc)
+        window_start = window_end - timedelta(minutes=5)
+
+    print("Query window UTC:", window_start, "→", window_end)
+
+    df = get_from_db_format(window_start, window_end)
+
+    if df.empty:
+        return jsonify([])
+
+    return jsonify(df.to_dict(orient="records"))
 
 if __name__ == "__main__":
     app.run(debug=True)
-
