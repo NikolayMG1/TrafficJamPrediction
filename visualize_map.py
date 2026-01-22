@@ -107,7 +107,7 @@ function confirmTime(){
 function startLiveMode(){
     liveMode = true;
     loadPoints();
-    refreshInterval = setInterval(loadPoints, 60000);
+    refreshInterval = setInterval(loadPoints, 300000);
 }
 
 function backToLive(){
@@ -134,12 +134,16 @@ def data():
     if not start:
         # LIVE MODE → last 5 minutes (UTC)
         window_end = datetime.now(timezone.utc) + timedelta(minutes=120)
+        temp = (window_end.minute // 5) * 5
+        window_end = window_end.replace(minute=temp, second=0, microsecond=0)
         window_start = window_end - timedelta(minutes=5)
     else:
         # HISTORICAL MODE → convert local time to UTC
         local_dt = datetime.fromisoformat(start)
         local_dt = local_dt.replace(tzinfo=FINLAND_TZ)
         window_end = local_dt.astimezone(timezone.utc) + timedelta(minutes=120)
+        temp = (window_end.minute // 5) * 5
+        window_end = window_end.replace(minute=temp, second=0, microsecond=0)
         window_start = window_end - timedelta(minutes=5)
 
     print("Query window UTC:", window_start, "→", window_end)
