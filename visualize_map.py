@@ -133,13 +133,13 @@ def data():
 
     if not start:
         # LIVE MODE → last 5 minutes (UTC)
-        window_end = datetime.now(timezone.utc)
+        window_end = datetime.now(timezone.utc) + timedelta(minutes=120)
         window_start = window_end - timedelta(minutes=5)
     else:
         # HISTORICAL MODE → convert local time to UTC
         local_dt = datetime.fromisoformat(start)
         local_dt = local_dt.replace(tzinfo=FINLAND_TZ)
-        window_end = local_dt.astimezone(timezone.utc)
+        window_end = local_dt.astimezone(timezone.utc) + timedelta(minutes=120)
         window_start = window_end - timedelta(minutes=5)
 
     print("Query window UTC:", window_start, "→", window_end)
