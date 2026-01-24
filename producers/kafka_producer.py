@@ -1,10 +1,7 @@
-import pprint
-
 import requests
 import json
 import time
 from kafka import KafkaProducer
-from datetime import datetime
 
 API_URL = "https://tie.digitraffic.fi/api/tms/v1/stations/data"
 API_COORDINATE_URL = "https://tie.digitraffic.fi/api/tms/v1/stations"

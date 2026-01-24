@@ -1,6 +1,3 @@
-import os
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from consumers.utils import read_and_parse_data, start_session, write_to_mongodb
 from producers.kafka_producer import KAFKA_TOPIC_STATION
