@@ -132,14 +132,13 @@ def data():
     start = request.args.get("start")
 
     if not start:
-        window_end = datetime.now(timezone.utc) + timedelta(minutes=120)
+        window_end = datetime.now(timezone.utc) 
         temp = (window_end.minute // 5) * 5
         window_end = window_end.replace(minute=temp, second=0, microsecond=0)
         window_start = window_end - timedelta(minutes=5)
     else:
         local_dt = datetime.fromisoformat(start)
-        local_dt = local_dt.replace(tzinfo=FINLAND_TZ)
-        window_end = local_dt.astimezone(timezone.utc) + timedelta(minutes=120)
+        window_end = local_dt.astimezone(timezone.utc) 
         temp = (window_end.minute // 5) * 5
         window_end = window_end.replace(minute=temp, second=0, microsecond=0)
         window_start = window_end - timedelta(minutes=5)

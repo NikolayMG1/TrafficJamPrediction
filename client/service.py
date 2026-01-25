@@ -21,11 +21,11 @@ def get_traffic_data(window_start: datetime, window_end: datetime):
     stations_col = db[STATIONS_COLLECTION]
 
     traffic_query = {
-        "window.start": {"$lt": window_end},
-        "window.end": {"$gt": window_start}
+        "window.start": {"$lte": window_end},
+        "window.end": {"$gte": window_start}
     }
 
-    print("QUERY (naive):", window_start, "→", window_end)
+    print("Time window:", window_start, "→", window_end)
 
     traffic_docs = list(traffic_col.find(traffic_query, {"_id": 0}))
     print("Traffic docs found:", len(traffic_docs))
