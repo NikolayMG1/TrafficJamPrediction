@@ -51,6 +51,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }
 
 var markers = L.layerGroup().addTo(map);
 var congestion_colors = {
+    "Full stop":"black",
     "Heavy traffic":"red",
     "Slightly congested":"yellow",
     "Not congested":"green"
